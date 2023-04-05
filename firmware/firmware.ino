@@ -49,7 +49,7 @@ void setup() {
   Keyboard.begin();
 
   //キーバインドのセット
-  Keybind::init();
+  KeyBindings::init();
 }
 
 unsigned long previousMillis = 0;
@@ -59,6 +59,10 @@ bool encoderPreviousState = false;
 int previous_ROT_A = 1;
 int previous_ROT_B = 1;
 int rot = 0;
+
+//----------------------------------------------------//
+// メインループ
+//----------------------------------------------------//
 void loop() {
   unsigned long currentMillis = millis();
 
@@ -68,6 +72,13 @@ void loop() {
   }
 
   //ロータリーエンコーダーの入力確認
+  Rot_Output();
+
+  Serial.println(rot);
+}
+
+//ロータリーエンコーダーの入出力処理
+void Rot_Output() {
   int current_ROT_A = digitalRead(_ROT_A);
   int current_ROT_B = digitalRead(_ROT_B);
   if (encoderPreviousState == false) {
@@ -90,38 +101,38 @@ void loop() {
   previous_ROT_B = current_ROT_B;
   //1入力の終了を検知
   if (current_ROT_A == 1 && current_ROT_B == 1) encoderPreviousState = false;
-
-  Serial.println(rot);
 }
 
 int beforeNumber = -1;
 //キーボード機能の出力
 void Key_Output() {
-  int cdata;
-  cdata = AE_KEYPAD4X3_getKeyInt();  //押されたキーを文字で出力する 例 '1'や'#'など
-  //Serial.println(cdata);
+  int keynum;
+  keynum = AE_KEYPAD4X3_getKeyInt();  //押されたキーを数字で出力する 0~11 (入力なし-1)
 
-  if (cdata != -1) {
-
-    if (beforeNumber != cdata || Keybind::key[cdata].repeat == true) {
-      beforeNumber = cdata;
-
-      //キー入力
-      for (int i = 0; i < 10; ++i) {
-        if (Keybind::key[cdata].keys[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
-        Keyboard.press(static_cast<KeyboardKeycode>(Keybind::key[cdata].keys[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
-      }
-      Keyboard.releaseAll();
-
-      //特殊な入力
-      for (int i = 0; i < 10; ++i) {
-        if (Keybind::key[cdata].consumers[i] == -1) break;
-        Consumer.press(static_cast<ConsumerKeycode>(Keybind::key[cdata].consumers[i]));
-      }
-      Consumer.releaseAll();
-    }
-  } else {
+  //入力なしなら 早期リターン
+  if (keynum == -1) {
     beforeNumber = -1;
+    return;
+  }
+
+  //前回と違うキーが押されている　||　押されたキーのリピートがオン
+  //なら、キーバインド情報を元に、キー出力する
+  if (beforeNumber != keynum || KeyBindings::key[keynum].repeat == true) {
+    beforeNumber = keynum;
+
+    //キー入力
+    for (int i = 0; i < 10; ++i) {
+      if (KeyBindings::key[keynum].outputs[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
+      Keyboard.press(static_cast<KeyboardKeycode>(KeyBindings::key[keynum].outputs[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
+    }
+    Keyboard.releaseAll();
+
+    //特殊な入力
+    for (int i = 0; i < 10; ++i) {
+      if (KeyBindings::key[keynum].consumers[i] == -1) break;
+      Consumer.press(static_cast<ConsumerKeycode>(KeyBindings::key[keynum].consumers[i]));
+    }
+    Consumer.releaseAll();
   }
 }
 
