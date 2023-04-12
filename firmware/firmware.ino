@@ -4,6 +4,7 @@
 #include <HID-Project.h>
 #include "keybind.h"
 
+
 //----------------------------------------//
 // AE_KEYPAD4X3   ------   Arduino UNO    //
 //                                        //
@@ -50,10 +51,11 @@ void setup() {
 
   //キーバインドのセット
   KeyBindings::init();
+  RotBindings::init();
 }
 
 unsigned long previousMillis = 0;
-const long interval = 100;  // 1秒間隔で処理を実行することを意味します
+const long interval = 165;  // 1秒間隔で処理を実行することを意味します 明るさ最速連打は165ほど、それ以上間隔が短いと反応しない
 
 bool encoderPreviousState = false;
 int previous_ROT_A = 1;
@@ -69,16 +71,18 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     Key_Output();
+    Rot_Output();
   }
 
   //ロータリーエンコーダーの入力確認
-  Rot_Output();
-
-  Serial.println(rot);
+  Rot_Input();
 }
 
+int rightCount = 0;
+int leftCount = 0;
+
 //ロータリーエンコーダーの入出力処理
-void Rot_Output() {
+void Rot_Input() {
   int current_ROT_A = digitalRead(_ROT_A);
   int current_ROT_B = digitalRead(_ROT_B);
   if (encoderPreviousState == false) {
@@ -101,6 +105,54 @@ void Rot_Output() {
   previous_ROT_B = current_ROT_B;
   //1入力の終了を検知
   if (current_ROT_A == 1 && current_ROT_B == 1) encoderPreviousState = false;
+
+  //出力処理
+  if(rot >= RotBindings::rot[0].right.sensitivity){
+    rot -= RotBindings::rot[0].right.sensitivity;
+    rightCount++;
+    Serial.write("rotation!,");
+  }
+  if(rot <= -RotBindings::rot[0].left.sensitivity){
+    rot += RotBindings::rot[0].left.sensitivity;
+    leftCount++;  
+  }
+  
+}
+
+void Rot_Output(){
+  if(rightCount > 0){
+    rightCount--;
+    
+    for (int i = 0; i < 10; ++i) {
+      if (RotBindings::rot[0].right.outputs[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
+      Keyboard.press(static_cast<KeyboardKeycode>(RotBindings::rot[0].right.outputs[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
+    }
+    Keyboard.releaseAll();
+
+    //特殊な入力
+    for (int i = 0; i < 10; ++i) {
+      if (RotBindings::rot[0].left.consumers[i] == -1) break;
+      Consumer.press(static_cast<ConsumerKeycode>(RotBindings::rot[0].right.consumers[i]));
+    }
+    Consumer.releaseAll();   
+  }
+
+  if(leftCount > 0){
+    leftCount--;
+
+    for (int i = 0; i < 10; ++i) {
+      if (RotBindings::rot[0].left.outputs[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
+      Keyboard.press(static_cast<KeyboardKeycode>(RotBindings::rot[0].left.outputs[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
+    }
+    Keyboard.releaseAll();
+
+    //特殊な入力
+    for (int i = 0; i < 10; ++i) {
+      if (RotBindings::rot[0].left.consumers[i] == -1) break;
+      Consumer.press(static_cast<ConsumerKeycode>(RotBindings::rot[0].left.consumers[i]));
+    }
+    Consumer.releaseAll();  
+  }
 }
 
 int beforeNumber = -1;
