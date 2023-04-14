@@ -21,7 +21,12 @@ class RotbindInfo {
 public:
   int outputs[10] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };  //この順で入力される。大文字のAが打ちたいなら先にKEY_LEFT_SHFTを入力する必要あり。
   int consumers[10] = { -1, -1, -1, -1, -1, -1, -1, -1, -1, -1 };
-  int sensitivity = 1;
+  unsigned long outputHoldMillis[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }; //0で単押し、1以上でそのmsだけ押しっぱなしにする （その間に再び押されると押している時間が延長される(連打しても一回の長押しになる(最後に押したときから指定msで離す)))
+  unsigned long consumerHoldMillis[10] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+  unsigned long outputHoldStartMillis[10] = {0};
+  unsigned long consumerHoldStartMillis[10] = {0};
+  double sensitivity = 1;
 };
 
 class RotLeftRight {
@@ -51,7 +56,26 @@ static void KeyBindings::init() {
   key[3].repeat = true;
 }
 
-static void RotBindings::init(){
-  //rot[0].left.consumers[0] = MEDIA_VOLUME_DOWN;
-  //rot[0].right.consumers[0] =MEDIA_VOLUME_UP;
+static void RotBindings::init() {
+  /*
+  rot[0].right.outputs[0] = KEY_RIGHT_ALT;
+  rot[0].right.outputHoldMillis[0] = 700;
+  rot[0].right.outputs[1] = KEY_TAB;
+
+  rot[0].left.outputs[0] = KEY_RIGHT_ALT;
+  rot[0].left.outputHoldMillis[0] = 700;
+  rot[0].left.outputs[1] = KEY_RIGHT_SHIFT;
+  rot[0].left.outputs[2] = KEY_TAB;
+  */
+
+
+  rot[0].left.consumers[0] = MEDIA_VOLUME_DOWN;
+  //rot[0].left.sensitivity = 2;
+  rot[0].right.consumers[0] =MEDIA_VOLUME_UP;
+  //rot[0].right.sensitivity = 2;
+
+  rot[0].left.consumers[0] = CONSUMER_BRIGHTNESS_DOWN;
+  //rot[0].left.consumerHoldMillis[0] = 300;
+  rot[0].right.consumers[0] = CONSUMER_BRIGHTNESS_UP;
+  //rot[0].right.consumerHoldMillis[0] = 300;
 }

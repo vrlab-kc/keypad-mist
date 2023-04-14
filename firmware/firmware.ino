@@ -37,8 +37,8 @@ char AE_KEYPAD4X3_getKeyChar(void);
 #define _ROT_B 16
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("AE_KEYPAD4X3 Test");
+  //Serial.begin(9600);
+  //Serial.println("AE_KEYPAD4X3 Test");
 
   AE_KEYPAD4X3_Init();  //KEYPAD用の入出力ピン設定
 
@@ -54,6 +54,7 @@ void setup() {
   RotBindings::init();
 }
 
+unsigned long currentMillis = 0;
 unsigned long previousMillis = 0;
 const long interval = 165;  // 1秒間隔で処理を実行することを意味します 明るさ最速連打は165ほど、それ以上間隔が短いと反応しない
 
@@ -62,24 +63,28 @@ int previous_ROT_A = 1;
 int previous_ROT_B = 1;
 int rot = 0;
 
+unsigned deltaTime = 0;
+
 //----------------------------------------------------//
 // メインループ
 //----------------------------------------------------//
 void loop() {
-  unsigned long currentMillis = millis();
+  currentMillis = millis();
 
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
     Key_Output();
-    Rot_Output();
   }
 
   //ロータリーエンコーダーの入力確認
   Rot_Input();
+
+  Rot_Output();
+  Rot_OutputRelease();
 }
 
-int rightCount = 0;
-int leftCount = 0;
+double rightCount = 0;
+double leftCount = 0;
 
 //ロータリーエンコーダーの入出力処理
 void Rot_Input() {
@@ -107,53 +112,110 @@ void Rot_Input() {
   if (current_ROT_A == 1 && current_ROT_B == 1) encoderPreviousState = false;
 
   //出力処理
-  if(rot >= RotBindings::rot[0].right.sensitivity){
-    rot -= RotBindings::rot[0].right.sensitivity;
-    rightCount++;
-    Serial.write("rotation!,");
+  if(rot >= 1){
+    rot -= 1;
+    rightCount += RotBindings::rot[0].right.sensitivity;
   }
-  if(rot <= -RotBindings::rot[0].left.sensitivity){
-    rot += RotBindings::rot[0].left.sensitivity;
-    leftCount++;  
+  if(rot <= -1){
+    rot += 1;
+    leftCount += RotBindings::rot[0].left.sensitivity;  
   }
   
 }
 
 void Rot_Output(){
-  if(rightCount > 0){
+  if(rightCount >= 1){
     rightCount--;
     
     for (int i = 0; i < 10; ++i) {
       if (RotBindings::rot[0].right.outputs[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
-      Keyboard.press(static_cast<KeyboardKeycode>(RotBindings::rot[0].right.outputs[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
+      
+      if(RotBindings::rot[0].right.outputHoldStartMillis[i] == 0)
+        Keyboard.press(static_cast<KeyboardKeycode>(RotBindings::rot[0].right.outputs[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
+
+      RotBindings::rot[0].right.outputHoldStartMillis[i] = currentMillis;
     }
-    Keyboard.releaseAll();
+    //Keyboard.releaseAll();
 
     //特殊な入力
     for (int i = 0; i < 10; ++i) {
       if (RotBindings::rot[0].left.consumers[i] == -1) break;
-      Consumer.press(static_cast<ConsumerKeycode>(RotBindings::rot[0].right.consumers[i]));
+
+      if(RotBindings::rot[0].right.consumerHoldStartMillis[i] == 0)
+        Consumer.press(static_cast<ConsumerKeycode>(RotBindings::rot[0].right.consumers[i]));
+
+      RotBindings::rot[0].right.consumerHoldStartMillis[i] =currentMillis;
     }
-    Consumer.releaseAll();   
+    //Consumer.releaseAll();   
   }
 
-  if(leftCount > 0){
+  if(leftCount >= 1){
     leftCount--;
 
     for (int i = 0; i < 10; ++i) {
       if (RotBindings::rot[0].left.outputs[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
-      Keyboard.press(static_cast<KeyboardKeycode>(RotBindings::rot[0].left.outputs[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
+
+      if(RotBindings::rot[0].left.outputHoldStartMillis[i] == 0)
+        Keyboard.press(static_cast<KeyboardKeycode>(RotBindings::rot[0].left.outputs[i]));  //引数はKeyboardKeycode型じゃないと駄目っぽい
+
+      RotBindings::rot[0].left.outputHoldStartMillis[i] = currentMillis;
     }
-    Keyboard.releaseAll();
+    //Keyboard.releaseAll();
 
     //特殊な入力
     for (int i = 0; i < 10; ++i) {
       if (RotBindings::rot[0].left.consumers[i] == -1) break;
-      Consumer.press(static_cast<ConsumerKeycode>(RotBindings::rot[0].left.consumers[i]));
+
+      if(RotBindings::rot[0].left.consumerHoldStartMillis[i] == 0)
+        Consumer.press(static_cast<ConsumerKeycode>(RotBindings::rot[0].left.consumers[i]));
+
+      RotBindings::rot[0].left.consumerHoldStartMillis[i] = currentMillis;
     }
-    Consumer.releaseAll();  
+    //Consumer.releaseAll();  
   }
 }
+
+//ロータリーエンコーダーで押したキーを残り時間が0なら話す処理
+void Rot_OutputRelease(){
+  //右
+  for (int i = 0; i < 10; ++i) {
+    if (RotBindings::rot[0].right.outputs[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
+    if (RotBindings::rot[0].right.outputHoldStartMillis[i] == 0) break;
+    if(currentMillis - RotBindings::rot[0].right.outputHoldStartMillis[i] >= RotBindings::rot[0].right.outputHoldMillis[i]){
+      Keyboard.release(static_cast<KeyboardKeycode>(RotBindings::rot[0].right.outputs[i]));
+      RotBindings::rot[0].right.outputHoldStartMillis[i] = 0;
+    }
+  }
+  
+  for (int i = 0; i < 10; ++i) {
+    if (RotBindings::rot[0].right.consumers[i] == -1) break;
+    if (RotBindings::rot[0].right.consumerHoldStartMillis[i] == 0) break;
+    if(currentMillis - RotBindings::rot[0].right.consumerHoldStartMillis[i] >= RotBindings::rot[0].right.consumerHoldMillis[i]){
+      Consumer.release(static_cast<ConsumerKeycode>(RotBindings::rot[0].right.consumers[i]));
+      RotBindings::rot[0].right.consumerHoldStartMillis[i] = 0;
+    }
+  }
+
+  //左
+  for (int i = 0; i < 10; ++i) {
+    if (RotBindings::rot[0].left.outputs[i] == -1) break;                               //入力が-1ならこれ以降入力なしと判定
+    if (RotBindings::rot[0].left.outputHoldStartMillis[i] == 0) break;
+    if(currentMillis - RotBindings::rot[0].left.outputHoldStartMillis[i] >= RotBindings::rot[0].left.outputHoldMillis[i]){
+      Keyboard.release(static_cast<KeyboardKeycode>(RotBindings::rot[0].left.outputs[i]));
+      RotBindings::rot[0].left.outputHoldStartMillis[i] = 0;
+    }
+  }
+  
+  for (int i = 0; i < 10; ++i) {
+    if (RotBindings::rot[0].left.consumers[i] == -1) break;
+    if (RotBindings::rot[0].left.consumerHoldStartMillis[i] == 0) break;
+    if(currentMillis - RotBindings::rot[0].left.consumerHoldStartMillis[i] >= RotBindings::rot[0].left.consumerHoldMillis[i]){
+      Consumer.release(static_cast<ConsumerKeycode>(RotBindings::rot[0].left.consumers[i]));
+      RotBindings::rot[0].left.consumerHoldStartMillis[i] = 0;
+    }
+  }
+}
+
 
 int beforeNumber = -1;
 //キーボード機能の出力
